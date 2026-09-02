@@ -112,6 +112,11 @@ function LiveConfigService.Get(): any
 	return copy(current)
 end
 
+function LiveConfigService.ApplyNativeExperiment(raw: any): boolean
+	current = validate(raw)
+	return true
+end
+
 function LiveConfigService.Refresh(): boolean
 	local ok, response = BackendClient.Get("/api/v1/config")
 	if not ok then
@@ -122,12 +127,19 @@ function LiveConfigService.Refresh(): boolean
 end
 
 function LiveConfigService.Start()
+	closing = false
 	current = defaults()
+	if not BackendClient.IsConfigured() then
+		return
+	end
+
 	task.spawn(LiveConfigService.Refresh)
 	task.spawn(function()
 		while not closing do
 			task.wait(Config.BackendConfigRefreshSeconds)
-			LiveConfigService.Refresh()
+			if not closing then
+				LiveConfigService.Refresh()
+			end
 		end
 	end)
 end
