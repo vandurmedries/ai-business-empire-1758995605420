@@ -24,6 +24,12 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
       - run: npm run verify
+      - name: Upload verified backend source
+        uses: actions/upload-artifact@v4
+        with:
+          name: ai-founder-empire-backend-source
+          path: backend
+          include-hidden-files: true
 
   luau-and-rojo:
     runs-on: ubuntu-latest
