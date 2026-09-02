@@ -4,7 +4,6 @@ local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Config = require(ReplicatedStorage:WaitForChild("Shared"):WaitForChild("Config"))
-local BackendClient = require(script.Parent:WaitForChild("BackendClient"))
 
 local AIService = {}
 
@@ -59,6 +58,59 @@ local TEMPLATE_ORDER = {
 	"reputation_lift",
 }
 
+local missionSchema = HttpService:JSONEncode({
+	type = "object",
+	additionalProperties = false,
+	properties = {
+		templateId = {
+			type = "string",
+			["enum"] = TEMPLATE_ORDER,
+		},
+		targetValue = {
+			type = "integer",
+			minimum = 1,
+			maximum = 5000,
+		},
+		rewardCash = {
+			type = "integer",
+			minimum = 25,
+			maximum = Config.Mission.MaximumRewardCash,
+		},
+		durationMinutes = {
+			type = "integer",
+			minimum = 10,
+			maximum = Config.Mission.MaximumDurationMinutes,
+		},
+	},
+	required = { "templateId", "targetValue", "rewardCash", "durationMinutes" },
+})
+
+local generator: any = nil
+local nextNativeRequestAt = 0
+
+local function createGenerator(): any
+	local ok, value = pcall(function()
+		local textGenerator = Instance.new("TextGenerator")
+		textGenerator.Name = "FounderMissionPlanner"
+		textGenerator.SystemPrompt = [[
+You create missions for AI Founder Empire, a Roblox business simulation. Your objective is to improve fun, comprehension, retention, trust, and sustainable voluntary monetization.
+
+Choose only one of the supplied curated mission template IDs. Adapt target, reward, and duration to the player's current progression. Keep the mission achievable and useful. Never claim the player will earn real money. Never create gambling, paid random rewards, external purchases, deceptive urgency, pressure aimed at minors, price changes, autonomous publishing, or ad spend. Output only JSON matching the supplied schema.
+]]
+		textGenerator.Temperature = 0.4
+		textGenerator.TopP = 0.5
+		textGenerator.Parent = script
+		return textGenerator
+	end)
+	if not ok then
+		warn("Roblox native TextGenerator is unavailable; missions will use the deterministic safe planner")
+		return nil
+	end
+	return value
+end
+
+generator = createGenerator()
+
 local function fallbackSelection(data: any): any
 	local index = ((data.CompletedMissions or 0) % #TEMPLATE_ORDER) + 1
 	local templateId = TEMPLATE_ORDER[index]
@@ -88,7 +140,7 @@ local function fallbackSelection(data: any): any
 	}
 end
 
-local function validateSelection(raw: any, data: any): any
+local function validateSelection(raw: any, data: any, sourceName: string): any
 	if type(raw) ~= "table" then
 		return fallbackSelection(data)
 	end
@@ -119,15 +171,21 @@ local function validateSelection(raw: any, data: any): any
 			10,
 			Config.Mission.MaximumDurationMinutes
 		),
-		source = "backend_curated",
+		source = sourceName,
 	}
 end
 
-function AIService.CreateMission(data: any, liveConfig: any, sessionId: string): any
-	local selection = nil
-	local ok, response = BackendClient.Post("/api/v1/mission", {
-		schemaVersion = 1,
-		sessionId = sessionId,
+local function nativeSelection(data: any, liveConfig: any): any?
+	if not generator then
+		return nil
+	end
+	if os.clock() < nextNativeRequestAt then
+		return nil
+	end
+	nextNativeRequestAt = os.clock() + 0.65
+
+	local prompt = HttpService:JSONEncode({
+		objective = "Choose the single best safe mission for this player's next session goal.",
 		company = {
 			level = data.Level,
 			cash = data.Cash,
@@ -142,13 +200,32 @@ function AIService.CreateMission(data: any, liveConfig: any, sessionId: string):
 			variant = liveConfig.Variant,
 			missionPromptVariant = liveConfig.MissionPromptVariant,
 		},
+		allowedTemplateIds = TEMPLATE_ORDER,
 	})
-	if ok then
-		selection = validateSelection(response, data)
-	else
-		selection = fallbackSelection(data)
+
+	local ok, response = pcall(function()
+		return generator:GenerateTextAsync({
+			UserPrompt = prompt,
+			MaxTokens = 160,
+			JsonSchema = missionSchema,
+		})
+	end)
+	if not ok or type(response) ~= "table" or type(response.GeneratedText) ~= "string" then
+		return nil
 	end
 
+	local decodeOk, decoded = pcall(function()
+		return HttpService:JSONDecode(response.GeneratedText)
+	end)
+	if not decodeOk then
+		return nil
+	end
+
+	return validateSelection(decoded, data, "roblox_native_ai")
+end
+
+function AIService.CreateMission(data: any, liveConfig: any, _sessionId: string): any
+	local selection = nativeSelection(data, liveConfig) or fallbackSelection(data)
 	local template = TEMPLATES[selection.templateId]
 	local now = os.time()
 	return {
