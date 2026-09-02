@@ -1,0 +1,63 @@
+name: Verify MVP
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run verify
+
+  luau-and-rojo:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Luau 0.736
+        run: |
+          curl --fail --location --silent --show-error \
+            https://github.com/luau-lang/luau/releases/download/0.736/luau-ubuntu.zip \
+            --output /tmp/luau.zip
+          unzip -q /tmp/luau.zip -d /tmp/luau
+          chmod +x /tmp/luau/luau-compile
+
+      - name: Compile every Luau source file
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            echo "Compiling $file"
+            /tmp/luau/luau-compile "$file" >/dev/null
+          done < <(find src -type f -name '*.lua' -print0)
+
+      - name: Install Rojo 7.7.0
+        run: |
+          curl --fail --location --silent --show-error \
+            https://github.com/rojo-rbx/rojo/releases/download/v7.7.0/rojo-7.7.0-linux-x86_64.zip \
+            --output /tmp/rojo.zip
+          unzip -q /tmp/rojo.zip -d /tmp/rojo
+          chmod +x /tmp/rojo/rojo
+
+      - name: Build Roblox place
+        run: /tmp/rojo/rojo build default.project.json --output AI-Founder-Empire.rbxlx
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AI-Founder-Empire-place
+          path: AI-Founder-Empire.rbxlx
