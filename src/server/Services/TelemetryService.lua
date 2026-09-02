@@ -12,8 +12,10 @@ local TelemetryService = {}
 
 local sessions: { [Player]: string } = setmetatable({}, { __mode = "k" }) :: any
 local pending: { any } = {}
+local observers: { (Player, string, number, any) -> () } = {}
 local closing = false
 local flushing = false
+local backendEnabled = false
 
 local ALLOWED_FIELD_TYPES = {
 	string = true,
@@ -67,6 +69,15 @@ local function sessionFor(player: Player): string
 	return sessionId
 end
 
+local function notifyObservers(player: Player, eventName: string, value: number, fields: any)
+	for _, observer in ipairs(observers) do
+		local ok, err = pcall(observer, player, eventName, value, fields)
+		if not ok then
+			warn(("Telemetry observer failed: %s"):format(tostring(err)))
+		end
+	end
+end
+
 local function enqueue(player: Player, eventName: string, value: number, fields: any?)
 	if #pending >= 500 then
 		table.remove(pending, 1)
@@ -85,6 +96,10 @@ local function enqueue(player: Player, eventName: string, value: number, fields:
 	})
 end
 
+function TelemetryService.RegisterObserver(observer: (Player, string, number, any) -> ())
+	table.insert(observers, observer)
+end
+
 function TelemetryService.GetSessionId(player: Player): string
 	return sessionFor(player)
 end
@@ -92,10 +107,14 @@ end
 function TelemetryService.Track(player: Player, eventName: string, value: number?, fields: any?)
 	local safeName = cleanText(eventName, 60)
 	local safeValue = tonumber(value) or 1
+	local safeFields = cleanFields(fields)
 	pcall(function()
 		AnalyticsService:LogCustomEvent(player, safeName, safeValue, {})
 	end)
-	enqueue(player, safeName, safeValue, fields)
+	notifyObservers(player, safeName, safeValue, safeFields)
+	if backendEnabled then
+		enqueue(player, safeName, safeValue, safeFields)
+	end
 end
 
 function TelemetryService.OnboardingStep(player: Player, step: number, stepName: string)
@@ -144,7 +163,7 @@ function TelemetryService.LogEconomy(
 end
 
 function TelemetryService.Flush(): boolean
-	if flushing or #pending == 0 then
+	if not backendEnabled or flushing or #pending == 0 then
 		return true
 	end
 	flushing = true
@@ -170,6 +189,8 @@ function TelemetryService.Flush(): boolean
 end
 
 function TelemetryService.Start()
+	closing = false
+	backendEnabled = BackendClient.IsConfigured()
 	for _, player in ipairs(Players:GetPlayers()) do
 		sessionFor(player)
 	end
@@ -181,16 +202,23 @@ function TelemetryService.Start()
 		sessions[player] = nil
 	end)
 
-	task.spawn(function()
-		while not closing do
-			task.wait(Config.BackendTelemetryFlushSeconds)
-			TelemetryService.Flush()
-		end
-	end)
+	if backendEnabled then
+		task.spawn(function()
+			while not closing do
+				task.wait(Config.BackendTelemetryFlushSeconds)
+				if not closing then
+					TelemetryService.Flush()
+				end
+			end
+		end)
+	end
 end
 
 function TelemetryService.Shutdown()
 	closing = true
+	if not backendEnabled then
+		return
+	end
 	local deadline = os.clock() + 3
 	repeat
 		if #pending == 0 or not TelemetryService.Flush() then
