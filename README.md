@@ -1,52 +1,73 @@
-# AI Founder Empire — Roblox + autonomous revenue operator
+# AI Founder Empire — Roblox-native AI revenue operator
 
-AI Founder Empire is a Roblox tycoon MVP in which each player grows a small AI-run company. A server-authoritative Roblox economy is connected to an external backend that generates safe player missions, collects privacy-minimised analytics, and can run a daily revenue-optimization loop.
+AI Founder Empire is a Roblox business-tycoon MVP in which each player grows a small AI-run company. The current runtime uses Roblox's native `TextGenerator`, `AnalyticsService`, `DataStoreService`, and `MarketplaceService`, so **Render, Railway, Vercel, Supabase, and an external AI API key are not required to run the game**.
 
-The operator is designed to maximize **sustainable creator revenue over a 90-day horizon**, not to pressure players into purchases. It may autonomously activate low-risk experiments such as tutorial hints, value demonstrations, mission wording, shop ordering, starter rewards, and content pacing. It cannot autonomously change prices, publish a Roblox build, spend advertising money, direct players to off-platform checkout, or create randomized paid rewards.
+The in-game operator is designed to maximize **sustainable creator revenue over a 90-day horizon** by improving fun, retention, comprehension, trust, and voluntary purchase value. It can autonomously select only bounded, reversible experiments such as tutorial presentation, mission framing, value demonstrations, shop ordering, and modest pacing changes.
 
-This repository contains:
+It cannot autonomously:
 
-- a Rojo-compatible Roblox project written in Luau;
-- server-authoritative progression, upgrades, persistence, receipts, passes, and subscription entitlement checks;
-- a responsive in-game founder dashboard built without external assets;
-- an authenticated backend for AI missions, event ingestion, live configuration, summaries, and the daily operator;
-- optional OpenAI Responses API integration with deterministic fallbacks;
-- optional Supabase persistence and SQL migrations;
-- a ready-to-paste Cofounder custom-agent contract and routines;
-- tests and a GitHub Actions workflow for the backend.
+- change Robux prices;
+- publish or update the Roblox experience;
+- spend advertising money;
+- send players to off-platform checkout;
+- create paid randomized rewards;
+- use deceptive scarcity or pressure aimed at minors;
+- claim that players will earn real money.
+
+## Included
+
+- Rojo-compatible Roblox project written in Luau;
+- responsive in-game founder dashboard without external assets;
+- server-authoritative company cycles, upgrades, rewards, and mission progress;
+- DataStore persistence and idempotent developer-product receipt handling;
+- game-pass and subscription entitlement checks;
+- Roblox-native AI mission selection with a deterministic safe fallback;
+- a Roblox-native revenue operator with an allowlisted experiment system;
+- Roblox Analytics events and privacy-minimized local optimization signals;
+- persistent visible disclosure that missions are AI-selected;
+- Cofounder-style company context, operator contract, and routines;
+- optional external backend source for a future cross-server analytics layer;
+- automated backend tests, Luau compilation, and Rojo place builds.
 
 ## Repository layout
 
 ```text
-src/                         Roblox source, synchronized with Rojo
-backend/                     Vercel-compatible Node.js API
-backend/supabase/migrations  Optional analytics/experiment database
-cofounder/                   Revenue Operator agent contract and routines
-docs/                        Setup, architecture, monetization, and launch checks
+src/                         Active Roblox-native game runtime
+cofounder/                   External Cofounder agent context and routines
+docs/                        Setup, monetization, architecture, and launch checks
+backend/                     Optional future cross-server analytics backend
+.github/workflows/ci.yml     Tests, Luau compilation, and place build
 ```
 
-## Fast start
+## Fast start — no hosting required
 
-1. Install Roblox Studio and Rojo.
-2. Create or open a Roblox experience.
-3. In this repository, run `rojo serve` and connect the Rojo Studio plugin.
-4. Set the IDs in `src/shared/Config.lua` after creating the products, passes, and subscription in Creator Hub.
-5. Deploy `backend/` to Vercel and configure the environment variables from `backend/.env.example`.
-6. Put the same `ROBLOX_SHARED_SECRET` value in the Roblox experience secret named `AI_BUSINESS_BACKEND_SECRET`.
-7. Set `BackendBaseUrl` in `src/shared/Config.lua` to the deployed HTTPS origin.
-8. Enable HTTP requests and Studio access to API services in Experience Settings for testing.
-9. Apply the Supabase migration if persistent analytics and autonomous experiments are required.
-10. Paste `cofounder/revenue-operator.md` into a Cofounder custom agent and connect GitHub, Vercel, and Supabase.
+1. Download the latest `AI-Founder-Empire-place` artifact from GitHub Actions, or install Rojo and run `rojo build default.project.json --output AI-Founder-Empire.rbxlx`.
+2. Open `AI-Founder-Empire.rbxlx` in Roblox Studio.
+3. Publish it as an experience owned by your Roblox account or group.
+4. Create the developer products, passes, and subscription in Creator Hub.
+5. Put their IDs in `src/shared/Config.lua`, rebuild, and republish.
+6. Enable Studio access to API services while testing DataStore persistence.
+7. Complete the experience's content-maturity questionnaire and disclose its generative-AI component.
+8. Test each purchase route in a private or controlled test environment before making the experience public.
 
-Detailed instructions are in [`docs/setup-roblox.md`](docs/setup-roblox.md) and [`docs/launch-checklist.md`](docs/launch-checklist.md).
+`BackendEnabled` can remain disabled. No HTTP secret or hosting URL is needed in native mode.
 
-## Backend tests
+## Cofounder.co role
+
+Cofounder.co is not embedded as an unrestricted browser inside Roblox. The game contains a Cofounder-style AI founder and revenue operator, while the files under `cofounder/` can be pasted into a Cofounder custom agent for external product, marketing, and operations work. Any external agent should remain unable to change prices, spend money, or publish builds without account-owner authorization.
+
+## Verification
+
+The GitHub workflow runs:
 
 ```bash
 cd backend
-npm test
+npm ci
+npm run verify
 ```
 
-## Important scope
+It also compiles every Luau source file and builds a `.rbxlx` place using Rojo.
 
-The project supplies a tested engineering foundation; it does not create a Roblox place, monetization asset IDs, an OpenAI API balance, a Supabase project, or guaranteed income by itself. Revenue starts only after the experience is completed, published, discoverable, and used by paying players. All purchases remain inside Roblox's official monetization systems.
+## Revenue scope
+
+The project supplies a functioning, tested monetization foundation. It does **not** guarantee revenue. Actual income begins only after the experience is published, discoverable, used, and chosen by paying players. All player purchases remain inside Roblox's official checkout systems, and Robux prices are configured in Creator Hub rather than by the AI.
