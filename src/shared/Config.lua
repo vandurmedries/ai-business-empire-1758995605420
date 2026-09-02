@@ -1,13 +1,13 @@
 --!strict
 
 local Config = {
-	Version = "0.1.0",
+	Version = "0.2.0",
 	ExperienceName = "AI Founder Empire",
 
-	-- Replace after deploying backend/. Must be HTTPS and must not end with a slash.
-	BackendBaseUrl = "https://YOUR-VERCEL-PROJECT.vercel.app",
+	-- Native mode is the default. No Render, Railway, Vercel, or external secret is required.
+	BackendBaseUrl = "",
 	BackendSecretName = "AI_BUSINESS_BACKEND_SECRET",
-	BackendEnabled = true,
+	BackendEnabled = false,
 	BackendConfigRefreshSeconds = 300,
 	BackendTelemetryFlushSeconds = 30,
 	BackendTelemetryBatchSize = 50,
